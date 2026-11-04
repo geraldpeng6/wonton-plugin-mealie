@@ -81,8 +81,8 @@ x-wonton:
     - network.egress
     # 邮箱没配时要提前装不上（compose 里对 WONTON_OWNER_EMAIL 的引用），所以要知道邮箱配没配。
     - owner.identity
-  # 上游没写最低内存；本机空闲实测约 300M（2026-11，v3.30.0，单用户空闲），取 512M。
+  # 上游没写最低内存；本机空闲实测约 68M（2026-11，v3.30.0，单用户空闲），抓取菜谱时有图片处理的尖峰，取 256M。
   # 镜像支持 amd64 和 arm64（ghcr 清单列表）。
   requirements:
     arch: [amd64, arm64]
-    memory: 512M
+    memory: 256M
