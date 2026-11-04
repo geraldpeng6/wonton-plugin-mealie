@@ -1,11 +1,18 @@
-# 云吞插件模板
+# 云吞插件：Mealie
 
-云吞（Wonton）的插件就是一个 `docker-compose.yml`，顶层多一个 `x-wonton` 字段，写明插件在云吞里的身份、网页入口和要的
-权限。一个插件一个 Git 仓库，仓库根目录就是插件包，发布就是打 tag。用户在 App 里装上插件，核心按清单起容器、接好登录，
-插件的网页在 App 里作为小程序打开。
+Mealie（[docs.mealie.io](https://docs.mealie.io)，AGPL-3.0）是自托管的菜谱库：从网址导入菜谱或手动建，按食材和标签找菜，
+排一周菜单、生成购物清单，数据和图片都在自己家里。这个插件把它装进云吞：网页经核心网关打开，登录走核心的身份提供方，
+主人的账号就是 Mealie 的管理员；主人在云吞里没配邮箱时插件装不上——Mealie 登录把邮箱声明列为必需。
 
-这个仓库是模板：一个能装上的示例插件（nginx 显示一个向用户问好的网页），加上检查、开发环境和发布三个脚本。从这个模板
-新建仓库，照着下面把示例换成你的应用。
+插件用上游官方镜像 `ghcr.io/mealie-recipes/mealie`，按摘要固定。数据（SQLite、图片）在插件自己的数据目录里，
+不需要额外的数据库和缓存服务。
+
+## 图标来源与许可
+
+`icon.png` 取自 Mealie v3.30.0 的官方 PNG（frontend/public/icons/android-chrome-maskable-512x512.png），未用图片模型生成；来源、版权、处理方式、上游 AGPL-3.0 全文和商标说明见 [NOTICE](NOTICE)。
+
+该标志为 Mealie 项目及其权利人的商标，仅用于识别本插件所集成的应用；本插件不代表 Mealie 官方，
+也不表示获得 Mealie 的合作、认可或背书。
 
 ## 准备
 
@@ -27,20 +34,17 @@ scripts/dev.sh up
 scripts/dev.sh install
 ```
 
-`up` 在本机起一套云吞，打印它的地址。示例（实例名取自目录名加 4 位随机数，端口随机）是
-`http://template3f2a.wonton.localhost:21234/`。浏览器打开，用 `scripts/dev.sh token` 输出的用户令牌登录。`install` 先列出
-插件要的权限，确认后装上，打印插件网页的地址。
-
-示例网页经 `sso: proxy` 拿到用户名，打开就是“你好，<用户名>”。换成真实应用时，把示例的 `description`、`about`、`tags`
-换成你的，`web/`、compose 里的两个 `configs` 和 `sso: proxy` 及其 `proxy` 删掉（默认让应用自己登录），`webui.service`、
-`port` 换成你的，按下面的规则重写。Chrome、Firefox 和 curl 把 `*.localhost` 直接解析到本机，不用改 hosts。
+`up` 在本机起一套云吞，打印它的地址（实例名取自目录名加 4 位随机数，端口随机），如
+`http://mealie3f2a.wonton.localhost:21234/`。浏览器打开，用 `scripts/dev.sh token` 输出的用户令牌登录。`install` 先列出
+插件要的权限，确认后装上，打印插件网页的地址；打开就直接以云吞身份进 Mealie，不用再登录。
+Chrome、Firefox 和 curl 把 `*.localhost` 直接解析到本机，不用改 hosts。
 
 ## 仓库里有什么
 
 | 路径 | 内容 |
 | --- | --- |
 | `docker-compose.yml` | 插件本身：compose 加上 `x-wonton` 清单 |
-| `icon.svg`、`web/` | 清单和 compose 引用的文件：图标、交给容器的配置和网页 |
+| `icon.png` | 清单引用的文件：图标（来源和许可见 `NOTICE`） |
 | `screenshots/` | 商店详情页里的截图 |
 | `scripts/check.sh` | 检查插件包，规则和安装时一样 |
 | `scripts/dev.sh` | 开发环境：起一套云吞，装、重装、卸载插件，看日志 |

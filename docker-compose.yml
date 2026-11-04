@@ -1,61 +1,88 @@
-# 示例插件：nginx 显示一个网页，向登录的人问好。照着 README 的“写插件”换成你的应用。
+# Mealie 菜谱库：网页经核心网关登录（OIDC 自动跳转，打开就是主人的管理员账号），
+# 从网址抓取菜谱要出网，SQLite 和图片存在插件数据目录里，不需要额外的数据库服务。
 services:
-  web:
-    # 镜像按摘要固定（多架构镜像写清单列表的摘要），标签只给人看。
-    image: nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
-    # 包里的文件经 configs 交给容器（核心在启动前写进去），不能用卷挂载。
-    configs:
-      - source: site
-        target: /etc/nginx/conf.d/default.conf
-      - source: page
-        target: /usr/share/nginx/html/index.html
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:v3.30.0@sha256:90f83da6f3ab0a421efc827118a556168573930105f13fa3321768f42163d784
+    # 官方入口先以 root 按 PUID/PGID 改建 abc 用户、chown /app 再降权运行（docker/entry.sh）；
+    # 服务不写 user，核心把数据目录交给 PUID:PGID，正好衔接。JWT 和会话的 SECRET/SESSION_SECRET
+    # 由 Mealie 首次启动生成、写进数据目录，升级保留，不用插件密钥。
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      # Mealie 用它生成 OIDC 回转地址和分享链接，写网关后面的公开地址。
+      BASE_URL: ${WONTON_APP_URL}
+      # 身份只从 OIDC 来，不开放应用自己的注册。
+      ALLOW_SIGNUP: "false"
+      OIDC_AUTH_ENABLED: "true"
+      # 打开网页直接进身份提供方，不看 Mealie 的登录页；加 ?direct=1 还能回登录页。
+      OIDC_AUTO_REDIRECT: "true"
+      OIDC_CONFIGURATION_URL: ${WONTON_OIDC_ISSUER}/.well-known/openid-configuration
+      OIDC_CLIENT_ID: ${WONTON_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${WONTON_OIDC_CLIENT_SECRET}
+      # 按用户名认人（云吞注入的用户名就是 OIDC 的 sub 和 preferred_username），邮箱会变，不按它认。
+      OIDC_USER_CLAIM: preferred_username
+      # 注入的 groups 声明是 ["owner"]，主人进 Mealie 就是管理员。
+      OIDC_ADMIN_GROUP: owner
+      # Mealie 把 email 列成 OIDC 的必需声明（v3.30.0 mealie/core/security/providers/openid_provider.py
+      # 的 required_claims），主人没配邮箱要到第一次登录才失败；这里引用注入的邮箱，让安装先失败并写明原因。
+      WONTON_OWNER_EMAIL: ${WONTON_OWNER_EMAIL:?用户还没配邮箱：Mealie 登录需要邮箱声明，先在云吞的资料里配好邮箱再装}
+    volumes:
+      - ${WONTON_APP_DATA}/data:/app/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      # 上游镜像自带的检查脚本：/api/app/about 由后端真正答出来才算过（镜像里有 curl）。
+      test: ["CMD", "/app/healthcheck.sh"]
       interval: 30s
       timeout: 5s
-      start_period: 30s
+      start_period: 60s
       start_interval: 1s
-
-configs:
-  site:
-    file: web/default.conf
-  page:
-    file: web/index.html
 
 x-wonton:
   spec: "0.4"
-  # 换成你自己的：反向域名形式，装上以后不能改。
-  id: app.example.hello
-  version: 0.1.1
+  id: io.mealie.mealie
+  version: 0.1.0
   kind: app
-  title: { zh: 你好, en: Hello }
-  description: { zh: 向登录的人问好的示例网页, en: An example page that greets whoever is signed in }
-  icon: icon.svg
+  title: { en: Mealie }
+  description:
+    zh: 把菜谱收进自己家的菜谱库，从网址导入，排周菜单、生成购物清单
+    en: Collect recipes at home, import them from a URL, plan the week and build shopping lists
+  icon: icon.png
   notices: [NOTICE]
   screenshots: [screenshots/home.png]
-  author: { name: Example }
-  homepage: https://nginx.org
-  # 应用（这里是 nginx）的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
-  license: BSD-2-Clause
+  author: { name: geraldpeng6 }
+  homepage: https://docs.mealie.io
+  # Mealie 是 AGPL-3.0；插件包自己的许可证在 LICENSE（MIT）。
+  license: AGPL-3.0-only
   tags:
-    zh: [工具]
-    en: [Tools]
+    zh: [菜谱]
+    en: [Recipes]
   about:
     zh: |
-      一个示例网页：登录以后，页面会向你问好。新建插件时可以照着改。
+      从网址导入菜谱，也可以手动建；食材、步骤、标签和图片都存在自己家里。按食材或标签找菜，排一周的菜单，
+      一键把菜单变成购物清单。
+
+      打开就用，不用再登录一次；云吞里的身份进来就是管理员。从网址导入要出网。
     en: |
-      An example page: once you are signed in, the page says hello. Copy it as a starting point for a new plugin.
-  release_notes: { zh: 名字和说明更新。, en: Product name and description update. }
+      Import recipes from a URL or write your own; ingredients, steps, tags and photos stay at home. Search by
+      ingredient or tag, plan the week's menu and turn it into a shopping list.
+
+      Opening the page is enough, there is no second login; your Wonton identity signs in as the admin.
+      Importing from a URL needs internet access.
+  release_notes: { zh: 第一版。, en: First release. }
   webui:
-    service: web
-    port: 80
-    # 应用不认 OIDC 时，由网关在请求上加上用户名（README 的“网页入口和登录”）。
-    sso: proxy
-    proxy:
-      headers:
-        Remote-User: "{user}"
-  permissions: []
-  # 上游 nginx 官方镜像，amd64 和 arm64 都有；上游没写最低内存，按本机空闲实测取整（实测约 24M，取 64M）。
+    service: mealie
+    port: 9000
+    sso: oidc
+    # Mealie 的 OIDC 回转地址是 <网页地址>/login：后端把浏览器送去身份提供方，回来时前端拿 code
+    # 调自己的接口换会话。
+    oidc:
+      redirect_paths: [/login]
+  permissions:
+    - network.egress
+    # 邮箱没配时要提前装不上（compose 里对 WONTON_OWNER_EMAIL 的引用），所以要知道邮箱配没配。
+    - owner.identity
+  # 上游没写最低内存；本机空闲实测约 300M（2026-11，v3.30.0，单用户空闲），取 512M。
+  # 镜像支持 amd64 和 arm64（ghcr 清单列表）。
   requirements:
     arch: [amd64, arm64]
-    memory: 64M
+    memory: 512M
