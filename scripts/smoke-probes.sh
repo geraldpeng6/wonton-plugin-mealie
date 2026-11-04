@@ -24,7 +24,8 @@ identity_check() { # Mealie 的 code 换会话由前端 JS 做：按浏览器的
     "$SMOKE_WEB_URL/api/auth/oauth/callback")" || { echo "换会话失败"; return 1; }
   at="$(jq -r '.access_token // empty' <<<"$me")"
   [[ -n "$at" ]] || { echo "回调没发 access_token：$me"; return 1; }
-  me="$(curl -sS --noproxy '*' --fail-with-body -H "Authorization: Bearer $at" "$SMOKE_WEB_URL/api/users/self")" ||
+  # 网关认的是会话 Cookie，Bearer 只给 Mealie 自己；两个都要带。
+  me="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" "$SMOKE_WEB_URL/api/users/self")" ||
     { echo "/api/users/self 失败"; return 1; }
   jq -e --arg u "$SMOKE_OWNER" '.admin == true and .username == $u' <<<"$me" >/dev/null ||
     { echo "当前用户不是 $SMOKE_OWNER 管理员：$me"; return 1; }
