@@ -1,6 +1,11 @@
 # shellcheck shell=bash
 # Mealie：sso=oidc（网关身份提供方登录，code 换会话）；清单没有 mcp。
 
+_ml_origin() { # web_url 可能带路径和查询，拼 API 前取 origin
+  local u="${SMOKE_WEB_URL%%\?*}" rest="${SMOKE_WEB_URL#*://}"
+  printf '%s://%s' "${u%%://*}" "${rest%%/*}"
+}
+
 web_assert() { grep -qi 'mealie'; }   # stdin：打开 / 落到的 Mealie 页面（SSR 出的 HTML）
 
 # Mealie 的 code 换会话由前端 JS 做：按浏览器的请求链自己走一遍，Cookie 存进 $SMOKE_JAR，
@@ -34,7 +39,7 @@ identity_check() { # 当前用户接口断言认出的是主人管理员
   local at me
   at="$(mealie_login)" || return 1
   # 网关认的是会话 Cookie，Bearer 只给 Mealie 自己；两个都要带。
-  me="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" "$SMOKE_WEB_URL/api/users/self")" ||
+  me="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" "$(_ml_origin)/api/users/self")" ||
     { echo "/api/users/self 失败"; return 1; }
   jq -e --arg u "$SMOKE_OWNER" '.admin == true and .username == $u' <<<"$me" >/dev/null ||
     { echo "当前用户不是 $SMOKE_OWNER 管理员：$me"; return 1; }
@@ -51,7 +56,7 @@ data_write() {
   marker="wonton-smoke-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" \
     -H 'Content-Type: application/json' -d "{\"name\":\"$marker\"}" \
-    "$SMOKE_WEB_URL/api/recipes/create")" || { echo "建菜谱失败：$resp"; return 1; }
+    "$(_ml_origin)/api/recipes/create")" || { echo "建菜谱失败：$resp"; return 1; }
   slug="$(jq -r '.slug // empty' <<<"$resp")"
   [[ -n "$slug" ]] || { echo "建菜谱没回 slug：$(head -c 200 <<<"$resp")"; return 1; }
   jq -e --arg m "$marker" '.name == $m' <<<"$resp" >/dev/null ||
@@ -65,7 +70,7 @@ data_check() {
   [[ -n "$slug" ]] || { echo "没有 data_write 留下的 slug 标记"; return 1; }
   at="$(mealie_login)" || return 1
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" \
-    "$SMOKE_WEB_URL/api/recipes/$slug")" || { echo "菜谱 $slug 读不回来（数据丢了？）：$resp"; return 1; }
+    "$(_ml_origin)/api/recipes/$slug")" || { echo "菜谱 $slug 读不回来（数据丢了？）：$resp"; return 1; }
   jq -e --arg s "$slug" '.slug == $s and .name != null' <<<"$resp" >/dev/null ||
     { echo "菜谱对不上：$(head -c 200 <<<"$resp")"; return 1; }
 }
