@@ -61,8 +61,11 @@ data_write() {
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" \
     -H 'Content-Type: application/json' -d "$body" \
     "$(_ml_origin)/api/recipes/create/html-or-json")" || { echo "建菜谱失败：$resp"; return 1; }
-  slug="$(jq -r <<<"$resp" 2>/dev/null)" && [[ -n "$slug" && "$slug" != null ]] ||
-    { echo "建菜谱没回 slug：$(head -c 200 <<<"$resp")"; return 1; }
+  slug="$(jq -r <<<"$resp" 2>/dev/null)" || slug=""
+  if [[ -z "$slug" || "$slug" == null ]]; then
+    echo "建菜谱没回 slug：$(head -c 200 <<<"$resp")"
+    return 1
+  fi
   jq -nc --arg s "$slug" --arg m "$marker" '{slug:$s,name:$m}' >"$(marker_file)"
 }
 
