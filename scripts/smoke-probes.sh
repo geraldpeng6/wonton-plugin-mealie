@@ -49,29 +49,32 @@ marker_file() { # SMOKE_STATE 在套件里是状态目录（e2e 传的是标记�
   if [[ -d "$SMOKE_STATE" ]]; then printf '%s' "$SMOKE_STATE/mealie-marker"; else printf '%s' "${SMOKE_STATE}.marker"; fi
 }
 
-# 数据：建一个名字带随机标记的菜谱（POST /api/recipes/create），重装/升级后按 slug 读回核对。
+# 数据：建一个名字带随机标记的菜谱（POST /api/recipes/create/html-or-json，v3.30 建谱端点；
+# 体是 schema.org/Recipe 的 JSON 字符串），重装/升级后按 slug 读回核对名字。
 data_write() {
-  local at marker resp slug
+  local at marker recipe_json body resp slug
   at="$(mealie_login)" || return 1
   marker="wonton-smoke-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+  recipe_json="$(jq -nc --arg n "$marker" \
+    '{"@context":"https://schema.org","@type":"Recipe","name":$n,"description":"云吞冒烟标记","recipeIngredient":["水 200 毫升"],"recipeInstructions":[{"@type":"HowToStep","text":"烧开"}]}')"
+  body="$(jq -nc --arg d "$recipe_json" '{data:$d}')"
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" \
-    -H 'Content-Type: application/json' -d "{\"name\":\"$marker\"}" \
-    "$(_ml_origin)/api/recipes/create")" || { echo "建菜谱失败：$resp"; return 1; }
-  slug="$(jq -r '.slug // empty' <<<"$resp")"
-  [[ -n "$slug" ]] || { echo "建菜谱没回 slug：$(head -c 200 <<<"$resp")"; return 1; }
-  jq -e --arg m "$marker" '.name == $m' <<<"$resp" >/dev/null ||
-    { echo "菜谱名不是标记：$(head -c 200 <<<"$resp")"; return 1; }
-  jq -nc --arg s "$slug" '{slug:$s}' >"$(marker_file)"
+    -H 'Content-Type: application/json' -d "$body" \
+    "$(_ml_origin)/api/recipes/create/html-or-json")" || { echo "建菜谱失败：$resp"; return 1; }
+  slug="$(jq -r <<<"$resp" 2>/dev/null)" && [[ -n "$slug" && "$slug" != null ]] ||
+    { echo "建菜谱没回 slug：$(head -c 200 <<<"$resp")"; return 1; }
+  jq -nc --arg s "$slug" --arg m "$marker" '{slug:$s,name:$m}' >"$(marker_file)"
 }
 
 data_check() {
-  local at slug resp
+  local at slug marker resp
   slug="$(jq -r '.slug // empty' "$(marker_file)" 2>/dev/null)" || true
-  [[ -n "$slug" ]] || { echo "没有 data_write 留下的 slug 标记"; return 1; }
+  marker="$(jq -r '.name // empty' "$(marker_file)" 2>/dev/null)" || true
+  [[ -n "$slug" && -n "$marker" ]] || { echo "没有 data_write 留下的 slug 标记"; return 1; }
   at="$(mealie_login)" || return 1
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "Authorization: Bearer $at" \
     "$(_ml_origin)/api/recipes/$slug")" || { echo "菜谱 $slug 读不回来（数据丢了？）：$resp"; return 1; }
-  jq -e --arg s "$slug" '.slug == $s and .name != null' <<<"$resp" >/dev/null ||
+  jq -e --arg s "$slug" --arg m "$marker" '.slug == $s and .name == $m' <<<"$resp" >/dev/null ||
     { echo "菜谱对不上：$(head -c 200 <<<"$resp")"; return 1; }
 }
 
