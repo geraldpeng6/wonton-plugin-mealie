@@ -1,6 +1,6 @@
 # 云吞插件：Mealie
 
-开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
+开发流程见[插件开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
 
 Mealie（[docs.mealie.io](https://docs.mealie.io)，AGPL-3.0）是自托管的菜谱库：从网址导入菜谱或手动建，按食材和标签找菜，
 排一周菜单、生成购物清单，数据和图片都在自己家里。这个插件把它装进云吞：网页经核心网关打开，登录走核心的身份提供方，
