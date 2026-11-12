@@ -42,10 +42,10 @@ x-wonton:
   id: io.mealie.mealie
   version: 0.1.0
   kind: app
-  title: { en: Mealie }
+  title: { zh: 家庭菜谱（Mealie）, en: Recipe Book (Mealie) }
   description:
-    zh: 把菜谱收进自己家的菜谱库，从网址导入，排周菜单、生成购物清单
-    en: Collect recipes at home, import them from a URL, plan the week and build shopping lists
+    zh: 像自家的下厨房：网上看到的好菜谱贴个网址就存进来，排好一周菜单，一键生成买菜清单。
+    en: "Your family recipe book: save a recipe from any website by pasting its link, plan the week's meals, and turn the plan into a shopping list in one tap."
   icon: icon.png
   notices: [NOTICE]
   screenshots: [screenshots/home.png]
