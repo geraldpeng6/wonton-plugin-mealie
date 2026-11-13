@@ -2,7 +2,7 @@
 # 从网址抓取菜谱要出网，SQLite 和图片存在插件数据目录里，不需要额外的数据库服务。
 services:
   mealie:
-    image: ghcr.io/mealie-recipes/mealie:v3.30.0@sha256:90f83da6f3ab0a421efc827118a556168573930105f13fa3321768f42163d784
+    image: ghcr.io/mealie-recipes/mealie:v3.31.0@sha256:97e21ac96e9a8d1ee15aaf558ba3f14998936b9d6f334e40ebb4c6c2127dc12f
     # 官方入口先以 root 按 PUID/PGID 改建 abc 用户、chown /app 再降权运行（docker/entry.sh）；
     # 服务不写 user，核心把数据目录交给 PUID:PGID，正好衔接。JWT 和会话的 SECRET/SESSION_SECRET
     # 由 Mealie 首次启动生成、写进数据目录，升级保留，不用插件密钥。
